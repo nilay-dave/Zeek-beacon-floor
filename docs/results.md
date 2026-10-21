@@ -15,22 +15,20 @@ The fewest observed intervals at which a detector finds 90% of beacons, at a 1% 
 
 | detector | jitter 0.0 | jitter 0.2 | jitter 0.4 | jitter 0.6 | jitter 0.8 | jitter 1.0 |
 | --- | --- | --- | --- | --- | --- | --- |
-| `interval-cv` | 4 | 4 | 6 | 8 | 12 | 32 |
-| `mad-ratio` | 4 | 6 | 12 | 16 | 32 | never |
-| `bowley-skew` | never | never | never | never | never | never |
-| `autocorrelation` | 8 | 12 | 48 | never | never | never |
-| `spectral` | 8 | 16 | 48 | never | never | never |
+| `interval-cv` | 4 | 4 | 4 | 6 | 12 | 32 |
+| `mad-ratio` | 4 | 4 | 8 | 16 | 32 | never |
+| `bowley-skew` | 4 | never | never | never | never | never |
+| `autocorrelation` | 6 | 12 | 48 | never | never | never |
+| `spectral` | 8 | 16 | 96 | never | never | never |
 
 Reaching the target at every jitter in the grid: `interval-cv`. The dispersion statistics hold up better than the spectral ones, which is the opposite of what the extra machinery in a spectral method suggests.
-
-Never reaching the target anywhere: `bowley-skew`. That is a measured negative result and it is kept rather than deleted. See [ADR 003](adr/adr-003-keep-the-detector-that-fails.md).
 
 ## What each detector cannot see
 
 | detector | needs at least | blind to |
 | --- | --- | --- |
 | `interval-cv` | 3 intervals | a single missed check in, which the standard deviation turns into irregularity, and two interleaved beacons, which look like one irregular one |
-| `mad-ratio` | 3 intervals | a slow drift in the interval, which stays close to the median throughout, and anything about the order the intervals arrived in |
+| `mad-ratio` | 3 intervals | a slow drift in the interval, which stays close to the median throughout; anything about the order the intervals arrived in; and a bare majority of identical intervals, which sets the deviation to zero and scores a perfect 1 however wild the rest are |
 | `bowley-skew` | 4 intervals | symmetric jitter of any size, which is skew free and therefore scores like a perfect beacon, so this is a shape test and not a regularity test |
 | `autocorrelation` | 6 intervals | a beacon whose interval changes during the capture, which has no single lag, and anything shorter than sixteen bins |
 | `spectral` | 6 intervals | the same drift autocorrelation misses, and a beacon running at a period close to the capture length, which has too few cycles to form a peak |
@@ -46,9 +44,9 @@ Hours of capture needed by `interval-cv`, the strongest detector here:
 | beacon period | jitter 0.0 | jitter 0.2 | jitter 0.4 | jitter 0.6 | jitter 0.8 | jitter 1.0 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 minute | 0.1 | 0.1 | 0.1 | 0.1 | 0.2 | 0.5 |
-| 5 minutes | 0.3 | 0.3 | 0.5 | 0.7 | 1.0 | 2.7 |
-| 1 hour | 4.0 | 4.0 | 6.0 | 8.0 | 12.0 | 32.0 |
-| 1 day | 96.0 | 96.0 | 144.0 | 192.0 | 288.0 | 768.0 |
+| 5 minutes | 0.3 | 0.3 | 0.3 | 0.5 | 1.0 | 2.7 |
+| 1 hour | 4.0 | 4.0 | 4.0 | 6.0 | 12.0 | 32.0 |
+| 1 day | 96.0 | 96.0 | 96.0 | 144.0 | 288.0 | 768.0 |
 
 A one minute beacon is found inside 0.5 hours even at the worst jitter in the grid, so the 12 hour advice is generous for it. A daily beacon needs 768 hours at that jitter and 96 hours with no jitter at all, which is weeks rather than a day. The guidance is not wrong; the unit hides a dependency on the thing the hunter does not know.
 
@@ -59,14 +57,14 @@ Cobalt Strike's jitter only shortens the sleep: `sleep 300 20` produces 240 to 3
 | detector | jitter | cobalt-strike | symmetric |
 | --- | --- | --- | --- |
 | `interval-cv` | 0.0 | 4 | 4 |
-| `interval-cv` | 0.2 | 4 | 6 |
-| `interval-cv` | 0.4 | 6 | 8 |
-| `interval-cv` | 0.6 | 8 | 12 |
+| `interval-cv` | 0.2 | 4 | 4 |
+| `interval-cv` | 0.4 | 4 | 6 |
+| `interval-cv` | 0.6 | 6 | 8 |
 | `interval-cv` | 0.8 | 12 | 16 |
 | `interval-cv` | 1.0 | 32 | 32 |
 | `mad-ratio` | 0.0 | 4 | 4 |
-| `mad-ratio` | 0.2 | 6 | 8 |
-| `mad-ratio` | 0.4 | 12 | 16 |
+| `mad-ratio` | 0.2 | 4 | 6 |
+| `mad-ratio` | 0.4 | 8 | 12 |
 | `mad-ratio` | 0.6 | 16 | 24 |
 | `mad-ratio` | 0.8 | 32 | 64 |
 
@@ -78,17 +76,17 @@ A real beacon misses: a laptop closes, a link drops. With 20% of check ins remov
 
 | detector | jitter 0.4, no misses | jitter 0.4, with misses |
 | --- | --- | --- |
-| `interval-cv` | 6 | 16 |
-| `mad-ratio` | 12 | 16 |
+| `interval-cv` | 4 | 16 |
+| `mad-ratio` | 8 | 16 |
 | `bowley-skew` | never | never |
 | `autocorrelation` | 48 | 96 |
-| `spectral` | 48 | 96 |
+| `spectral` | 96 | never |
 
 ## Runtime
 
 | pairs | connections | all five detectors |
 | --- | --- | --- |
-| 1,000 | 24,500 | 0.57s |
-| 10,000 | 245,000 | 6.04s |
+| 1,000 | 25,000 | 0.59s |
+| 10,000 | 250,000 | 6.66s |
 
-245,000 connections scored by every detector in 6.0 seconds, which is a conn.log sized problem on a laptop.
+250,000 connections scored by every detector in 6.7 seconds, which is a conn.log sized problem on a laptop.

@@ -36,8 +36,8 @@ capture for a one minute beacon and
 a daily one, which is a month.
 
 The plain dispersion statistic beats both spectral detectors, and `bowley-skew`
-never reaches the target anywhere in the grid. Both results are on the
-[results](results.md) page.
+finds a beacon only when it has no jitter at all, which is the blindness it
+declares. Both results are on the [results](results.md) page.
 
 ## Install
 

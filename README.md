@@ -47,22 +47,28 @@ averaged over <!--number:conditions.seeds-->8<!--/number--> seeds:
 
 | detector | no jitter | 40% jitter | 80% jitter | 100% jitter |
 | --- | --- | --- | --- | --- |
-| `interval-cv` | <!--number:headline.interval-cv.intervals_needed_by_jitter.0-->4<!--/number--> | <!--number:headline.interval-cv.intervals_needed_by_jitter.40-->6<!--/number--> | <!--number:headline.interval-cv.intervals_needed_by_jitter.80-->12<!--/number--> | <!--number:headline.interval-cv.intervals_needed_by_jitter.100-->32<!--/number--> |
-| `mad-ratio` | <!--number:headline.mad-ratio.intervals_needed_by_jitter.0-->4<!--/number--> | <!--number:headline.mad-ratio.intervals_needed_by_jitter.40-->12<!--/number--> | <!--number:headline.mad-ratio.intervals_needed_by_jitter.80-->32<!--/number--> | never |
-| `autocorrelation` | <!--number:headline.autocorrelation.intervals_needed_by_jitter.0-->8<!--/number--> | <!--number:headline.autocorrelation.intervals_needed_by_jitter.40-->48<!--/number--> | never | never |
-| `spectral` | <!--number:headline.spectral.intervals_needed_by_jitter.0-->8<!--/number--> | <!--number:headline.spectral.intervals_needed_by_jitter.40-->48<!--/number--> | never | never |
-| `bowley-skew` | never | never | never | never |
+| `interval-cv` | <!--number:headline.interval-cv.intervals_needed_by_jitter.0-->4<!--/number--> | <!--number:headline.interval-cv.intervals_needed_by_jitter.40-->4<!--/number--> | <!--number:headline.interval-cv.intervals_needed_by_jitter.80-->12<!--/number--> | <!--number:headline.interval-cv.intervals_needed_by_jitter.100-->32<!--/number--> |
+| `mad-ratio` | <!--number:headline.mad-ratio.intervals_needed_by_jitter.0-->4<!--/number--> | <!--number:headline.mad-ratio.intervals_needed_by_jitter.40-->8<!--/number--> | <!--number:headline.mad-ratio.intervals_needed_by_jitter.80-->32<!--/number--> | never |
+| `autocorrelation` | <!--number:headline.autocorrelation.intervals_needed_by_jitter.0-->6<!--/number--> | <!--number:headline.autocorrelation.intervals_needed_by_jitter.40-->48<!--/number--> | never | never |
+| `spectral` | <!--number:headline.spectral.intervals_needed_by_jitter.0-->8<!--/number--> | <!--number:headline.spectral.intervals_needed_by_jitter.40-->96<!--/number--> | never | never |
+| `bowley-skew` | <!--number:headline.bowley-skew.intervals_needed_by_jitter.0-->4<!--/number--> | never | never | never |
 
 The plain dispersion statistic wins, which is the opposite of what the extra
 machinery in a spectral method suggests. Autocorrelation and the FFT need a
 longer and cleaner series to form a peak, and jitter accumulates as phase drift
 that smears it.
 
-`bowley-skew` never reaches the target anywhere. That is a measured negative
-result and it is kept rather than deleted, because it declared in its own
-`blind_to` field, before the sweep ran, that symmetric jitter is skew free and
-would therefore score like a perfect beacon. See
-[ADR 003](docs/adr/adr-003-keep-the-detector-that-fails.md).
+`bowley-skew` finds a beacon with no jitter at all and nothing else. It is a
+shape test, and uniform jitter is nearly skew free in both models, so a
+jittered beacon looks like an unjittered one to it. That is the blindness it
+declares in its own `blind_to` field.
+
+It is in the repository because an earlier version of this table read `never`
+in every column, including the one at zero jitter where that blindness does
+not apply, and the declaration was accepted as the explanation. The real cause
+was a floating point bug.
+[ADR 003](docs/adr/adr-003-keep-the-detector-that-fails.md) is about how a true
+statement stood in front of it.
 
 ## The same floor, in hours
 
@@ -136,10 +142,10 @@ hardcodes `conn_state` at index 11 reads `local_orig` on a Zeek 8 log, gets a
 plausible string back, and reports nothing wrong. A headerless TSV is refused
 rather than guessed.
 
-<!--number:runtime[1].connections-->245,000<!--/number--> connections across
+<!--number:runtime[1].connections-->250,000<!--/number--> connections across
 <!--number:runtime[1].pairs-->10,000<!--/number--> pairs, scored by all five
 detectors, takes
-<!--number:runtime[1].seconds-->6.0<!--/number--> seconds.
+<!--number:runtime[1].seconds-->6.7<!--/number--> seconds.
 
 ## The detectors
 
