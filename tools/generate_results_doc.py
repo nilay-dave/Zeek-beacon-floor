@@ -19,6 +19,11 @@ TARGET = ROOT / "docs" / "results.md"
 NEVER = "never"
 
 
+def jkey(jitter: float) -> str:
+    """Jitter keys in the metrics file are integer percentages, not "0.4"."""
+    return str(int(round(jitter * 100)))
+
+
 def plural(word: str, count: int) -> str:
     return word if count == 1 else word + "s"
 
@@ -65,7 +70,7 @@ def render(data: dict) -> str:
     add("| --- | " + " | ".join("---" for _ in jitters) + " |")
     for name, entry in headline.items():
         needed = entry["intervals_needed_by_jitter"]
-        add(f"| `{name}` | " + " | ".join(cell(needed[f"{j:.1f}"]) for j in jitters) + " |")
+        add(f"| `{name}` | " + " | ".join(cell(needed[jkey(j)]) for j in jitters) + " |")
     add("")
 
     reached_everywhere = [
@@ -126,13 +131,13 @@ def render(data: dict) -> str:
     for period in periods:
         cells = []
         for jitter in jitters:
-            row = hours[f"{jitter:.1f}"]
+            row = hours[jkey(jitter)]
             cells.append(NEVER if row is None else f"{row[period]:,.1f}")
         add(f"| {labels[period]} | " + " | ".join(cells) + " |")
     add("")
 
-    worst = hours[f"{jitters[-1]:.1f}"]
-    clean = hours[f"{jitters[0]:.1f}"]
+    worst = hours[jkey(jitters[-1])]
+    clean = hours[jkey(jitters[0])]
     if worst and clean:
         add(
             f"A one minute beacon is found inside {worst['60']:.1f} hours even at the worst jitter in the "
@@ -155,7 +160,7 @@ def render(data: dict) -> str:
     add("| --- | --- | --- | --- |")
     for name, entry in data["jitter_models"].items():
         for jitter in jitters:
-            key = f"{jitter:.1f}"
+            key = jkey(jitter)
             left, right = entry["cobalt-strike"][key], entry["symmetric"][key]
             if left is None and right is None:
                 continue
@@ -178,7 +183,7 @@ def render(data: dict) -> str:
     add("| detector | jitter 0.4, no misses | jitter 0.4, with misses |")
     add("| --- | --- | --- |")
     for name, entry in misses["detectors"].items():
-        add(f"| `{name}` | {cell(entry['no_misses']['0.4'])} | {cell(entry['with_misses']['0.4'])} |")
+        add(f"| `{name}` | {cell(entry['no_misses']['40'])} | {cell(entry['with_misses']['40'])} |")
     add("")
 
     add("## Runtime")

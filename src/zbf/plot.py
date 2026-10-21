@@ -101,6 +101,12 @@ def floor_chart(
                 label=name,
             )
         if missed:
+            # A detector that reached the target nowhere has no plotted line,
+            # so without labelling the open markers it vanishes from the
+            # legend entirely and a reader cannot tell whose markers these
+            # are. bowley-skew is exactly that case, and it is the row the
+            # chart most needs to identify.
+            label = None if reached else name
             left.plot(
                 missed,
                 [off_scale] * len(missed),
@@ -109,6 +115,7 @@ def floor_chart(
                 linestyle="none",
                 markersize=6.5,
                 markerfacecolor="white",
+                label=label,
             )
             right.plot(
                 missed,
@@ -118,6 +125,7 @@ def floor_chart(
                 linestyle="none",
                 markersize=6.5,
                 markerfacecolor="white",
+                label=label,
             )
 
     left.set_yscale("log")
@@ -125,7 +133,9 @@ def floor_chart(
     left.set_xlabel("jitter (fraction of the beacon period)")
     left.set_title("What a detector needs, in intervals", fontsize=11)
     left.axhline(off_scale, color="#999999", linewidth=0.8, linestyle=":")
-    left.text(jitter_grid[0], off_scale * 1.08, NEVER, fontsize=8, color="#555555")
+    # Right aligned, because the legend sits in the upper left and the two
+    # overlapped.
+    left.text(jitter_grid[-1], off_scale * 1.12, NEVER, fontsize=8, color="#555555", ha="right")
     left.grid(alpha=0.25, linewidth=0.6)
     left.legend(fontsize=9, loc="upper left")
 
@@ -135,7 +145,7 @@ def floor_chart(
     right.set_title(f"The same floor for a {period_seconds / 3600:.0f} hour beacon", fontsize=11)
     for hours, label in ((12, "12h, common minimum"), (24, "24h, commonly called ideal")):
         right.axhline(hours, color="#b02418", linewidth=1.0, linestyle="--", alpha=0.8)
-        right.text(jitter_grid[0], hours * 1.08, label, fontsize=8, color="#b02418")
+        right.text(jitter_grid[-1], hours * 1.09, label, fontsize=8, color="#b02418", ha="right")
     right.grid(alpha=0.25, linewidth=0.6)
     right.legend(fontsize=9, loc="upper left")
 

@@ -54,9 +54,20 @@ GUIDANCE_MINIMUM_HOURS = 12.0
 GUIDANCE_IDEAL_HOURS = 24.0
 
 
+def jitter_key(jitter: float) -> str:
+    """Jitter as an integer percentage, used as a key in the metrics file.
+
+    Not "0.4". tools/check_numbers.py addresses a published figure by a dotted
+    path into this file, and a key containing a dot cannot be addressed at all,
+    so every figure stored under one would be unpublishable, or published and
+    silently unchecked.
+    """
+    return str(int(round(jitter * 100)))
+
+
 def floors_for(detector, seeds, samples, model=COBALT_STRIKE, miss_rate=0.0, target=DEFAULT_TARGET_TPR):
     result = sweep(detector, INTERVAL_GRID, JITTER_GRID, seeds=seeds, samples=samples, model=model, miss_rate=miss_rate)
-    return result, {f"{jitter:.1f}": result.required_intervals(jitter, target) for jitter in JITTER_GRID}
+    return result, {jitter_key(jitter): result.required_intervals(jitter, target) for jitter in JITTER_GRID}
 
 
 def experiment_a(seeds, samples):
@@ -70,21 +81,24 @@ def experiment_a(seeds, samples):
             "blind_to": detector.blind_to,
             "min_intervals": detector.min_intervals,
             "intervals_needed_by_jitter": floors,
-            "worst_jitter_handled": max((float(j) for j, v in floors.items() if v is not None), default=None),
-            "intervals_at_zero_jitter": floors["0.0"],
+            "worst_jitter_handled": max((int(j) for j, v in floors.items() if v is not None), default=None),
+            "intervals_at_zero_jitter": floors["0"],
             "tpr_grid": {
-                f"{p.jitter:.1f}": {str(q.intervals): round(q.tpr, 4) for q in result.at(p.jitter)}
+                jitter_key(p.jitter): {str(q.intervals): round(q.tpr, 4) for q in result.at(p.jitter)}
                 for p in result.points
             },
         }
-        if len(reached) < len(JITTER_GRID):
-            worst = out[name]["worst_jitter_handled"]
-            verdict = "never reaches the target" if worst is None else f"gives up above {worst:.1f} jitter"
+        clean = floors["0"]
+        if not reached:
+            summary = "never reaches the target anywhere in the grid"
+        elif len(reached) < len(JITTER_GRID):
+            summary = (
+                f"needs {clean} intervals with no jitter, "
+                f"gives up above {out[name]['worst_jitter_handled']} percent jitter"
+            )
         else:
-            verdict = "reaches the target at every jitter"
-        clean = floors["0.0"]
-        needs = f"needs {clean} intervals with no jitter" if clean else "never reaches the target at all"
-        print(f"   {name:16} {needs}, {verdict}  [{time.perf_counter() - started:.1f}s]")
+            summary = f"needs {clean} intervals with no jitter, reaches the target at every jitter"
+        print(f"   {name:16} {summary}  [{time.perf_counter() - started:.1f}s]")
     return out
 
 
@@ -96,7 +110,7 @@ def experiment_b(seeds, samples):
         _, cobalt = floors_for(detector, seeds, samples, model=COBALT_STRIKE)
         _, symmetric = floors_for(detector, seeds, samples, model=SYMMETRIC)
         out[name] = {"cobalt-strike": cobalt, "symmetric": symmetric}
-        for jitter in ("0.4", "0.8"):
+        for jitter in ("40", "80"):
             print(f"   {name:16} j={jitter}  cobalt-strike {cobalt[jitter]}  symmetric {symmetric[jitter]}")
     return out
 
@@ -108,7 +122,7 @@ def experiment_c(seeds, samples, miss_rate):
         _, clean = floors_for(detector, seeds, samples)
         _, missing = floors_for(detector, seeds, samples, miss_rate=miss_rate)
         out[name] = {"no_misses": clean, "with_misses": missing}
-        print(f"   {name:16} j=0.4  {clean['0.4']} -> {missing['0.4']}")
+        print(f"   {name:16} j=0.4  {clean['40']} -> {missing['40']}")
     return out
 
 
@@ -124,7 +138,7 @@ def experiment_d(headline):
             rows[jitter] = {f"{int(p)}": round(hours_of_capture(needed, p), 3) for p in PERIODS}
         out[name] = rows
     best = out["interval-cv"]
-    for jitter in ("0.0", "0.6", "1.0"):
+    for jitter in ("0", "60", "100"):
         if best[jitter]:
             print(f"   interval-cv j={jitter}  1h beacon needs {best[jitter]['3600']:.1f} hours of capture")
     return out

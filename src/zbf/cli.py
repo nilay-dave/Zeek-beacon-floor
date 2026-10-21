@@ -198,7 +198,9 @@ def build_parser() -> argparse.ArgumentParser:
     one.set_defaults(func=cmd_score)
 
     def sweep_arguments(sub):
-        sub.add_argument("--intervals", default="4,6,8,12,16,24,32,48,64")
+        # The same grid the benchmark uses, so a local run and the published
+        # figures top out in the same place and "never" means the same thing.
+        sub.add_argument("--intervals", default="4,6,8,12,16,24,32,48,64,96,128")
         sub.add_argument("--jitter", default="0.0,0.2,0.4,0.6,0.8,1.0")
         sub.add_argument("--seeds", type=int, default=8)
         sub.add_argument("--samples", type=int, default=400)
