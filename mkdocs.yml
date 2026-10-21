@@ -1,0 +1,46 @@
+site_name: zeek-beacon-floor
+site_description: Where beacon detection stops working, measured in intervals observed rather than hours of capture.
+site_url: https://__GITHUB_USERNAME__.github.io/zeek-beacon-floor/
+repo_url: https://github.com/__GITHUB_USERNAME__/zeek-beacon-floor
+repo_name: __GITHUB_USERNAME__/zeek-beacon-floor
+edit_uri: ""
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Results: results.md
+  - Limitations: limitations.md
+  - Sources: sources.md
+  - Decisions:
+      - Intervals, not hours: adr/adr-001-measure-in-intervals-not-hours.md
+      - Generous to the detectors: adr/adr-002-generous-to-the-detectors.md
+      - Keep the detector that fails: adr/adr-003-keep-the-detector-that-fails.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+strict: true

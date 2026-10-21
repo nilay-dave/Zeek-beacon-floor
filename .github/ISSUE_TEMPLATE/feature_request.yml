@@ -1,0 +1,29 @@
+name: Feature request
+description: Something this should do and does not
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to find out, and where this tool stops short.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: kind
+    attributes:
+      label: Does this involve
+      options:
+        - label: A new detector (it will need a `blind_to` and a test that demonstrates the blindness)
+        - label: A change to how the floor is measured
+        - label: Reading a log format this does not handle
+        - label: None of these
+
+  - type: markdown
+    attributes:
+      value: >
+        Worth reading first: `docs/limitations.md`. In particular, this
+        measures periodic against not periodic. No timing statistic separates a
+        beacon from a monitoring agent, and a feature request to do so is a
+        request for a different kind of evidence.

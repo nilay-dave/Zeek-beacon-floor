@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # provenance_check.py reads the commit history, which a shallow
+          # checkout does not have.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: |
+          python -m ruff format --check .
+          python -m ruff check .
+
+      - name: Test
+        run: python -m pytest --cov=zbf --cov-report=term-missing --cov-report=xml
+
+      - name: Nothing in this project opens a socket
+        # zbf reads files and computes. There is no network path at all, which
+        # is a claim worth enforcing rather than repeating: a dependency or a
+        # future feature that reached out would make an offline analysis tool
+        # into something a responder cannot run on an isolated host.
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          pattern = re.compile(r"\b(urlopen|requests\.|httpx\.|socket\.|urllib\.request)")
+          offenders = []
+          for path in pathlib.Path("src").rglob("*.py"):
+              if pattern.search(path.read_text(encoding="utf-8")):
+                  offenders.append(str(path))
+          if offenders:
+              print("these reach the network in an offline tool:", offenders, file=sys.stderr)
+              raise SystemExit(1)
+          print("no module under src/ opens a socket")
+          PY
+
+      - name: Every published figure is labelled a simulation
+        # The one claim this repository cannot get wrong. If the metrics file
+        # ever stops saying its numbers are simulated, the build stops too.
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          note = json.loads(pathlib.Path("docs/metrics.json").read_text())["note"]
+          if "simulation" not in note.lower():
+              print("docs/metrics.json no longer states that its figures are simulated", file=sys.stderr)
+              raise SystemExit(1)
+          print("metrics.json states its figures are simulations")
+          PY
+
+      - name: House style
+        run: |
+          python tools/check_dashes.py
+          python tools/check_tables.py
+
+      - name: Declared dependencies are all used
+        run: python tools/check_dependencies.py
+
+      - name: Published numbers match the measured ones
+        run: python tools/check_numbers.py
+
+      - name: The results page matches the metrics
+        run: python tools/generate_results_doc.py --check
+
+      - name: Provenance
+        if: matrix.python == '3.13'
+        run: python scripts/provenance_check.py
+
+  determinism:
+    name: the floor is reproducible from its seeds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Measure the same floor twice and compare
+        # The floor is read off differences of a few percentage points, so a
+        # sweep that did not reproduce would make every published number a
+        # coincidence. Reduced scale, because this checks reproducibility and
+        # not the headline values.
+        run: |
+          python - <<'PY'
+          import sys
+          from zbf.detect import DETECTORS
+          from zbf.floor import sweep
+
+          grid_intervals, grid_jitter = [4, 8, 16, 32], [0.0, 0.4, 0.8]
+          failures = []
+          for name in ("interval-cv", "autocorrelation"):
+              one = sweep(DETECTORS[name], grid_intervals, grid_jitter, seeds=2, samples=150)
+              two = sweep(DETECTORS[name], grid_intervals, grid_jitter, seeds=2, samples=150)
+              for left, right in zip(one.points, two.points, strict=True):
+                  if left != right:
+                      failures.append(f"{name} at {left.intervals} intervals, {left.jitter} jitter: {left} != {right}")
+          if failures:
+              print("two sweeps of the same seeds disagreed:", file=sys.stderr)
+              for line in failures:
+                  print(" ", line, file=sys.stderr)
+              raise SystemExit(1)
+          print("both sweeps agree at every grid point")
+          PY

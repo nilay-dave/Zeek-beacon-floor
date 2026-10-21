@@ -1,0 +1,42 @@
+name: Bug report
+description: Something behaves differently from what the documentation says
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran and what came back. Paste the output.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`zbf --version`, or the commit if you are running from a checkout"
+    validations:
+      required: true
+
+  - type: input
+    id: zeek
+    attributes:
+      label: Which Zeek wrote the log
+      description: "Column positions moved in Zeek 8, so the version matters for reader problems."
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: >
+        Please do not paste a conn.log. It is a record of who on your network
+        talked to whom and when. The output of `zbf fields yourlog.log`, which
+        is only column names, is usually enough to diagnose a reader problem.
