@@ -63,30 +63,41 @@ def beacon(
     return arrivals
 
 
-def poisson(count: int, rate_per_hour: float, rng: np.random.Generator) -> np.ndarray:
-    """Memoryless traffic: a workstation talking to something when a person acts."""
-    gaps = rng.exponential(3600.0 / rate_per_hour, count)
-    return np.cumsum(gaps)
+def poisson(intervals: int, rate_per_hour: float, rng: np.random.Generator) -> np.ndarray:
+    """Memoryless traffic: a workstation talking to something when a person acts.
+
+    Takes a number of intervals, not arrivals, so that it agrees with
+    ``beacon`` about what the number means. It did not: beacon returned
+    intervals + 1 arrivals and this returned count arrivals, so every
+    comparison scored positives at one series length and calibrated the
+    threshold at another. At the shortest grid point that refused every
+    negative outright, which reported a detection rate of zero for detectors
+    that had scored every positive correctly.
+    """
+    gaps = rng.exponential(3600.0 / rate_per_hour, intervals)
+    return np.concatenate([[0.0], np.cumsum(gaps)])
 
 
-def bursty(count: int, rng: np.random.Generator, session_mean: int = 8) -> np.ndarray:
+def bursty(intervals: int, rng: np.random.Generator, session_mean: int = 8) -> np.ndarray:
     """Traffic in sessions: a burst of connections, then a long quiet gap.
 
     This is the negative that matters. Inside a burst the intervals are short
     and similar, so a dispersion statistic computed over a window that lands
     inside one burst sees regularity. Poisson traffic alone would make the
     false positive rate look better than any hunter has ever seen it.
+
+    Takes a number of intervals, for the reason given on ``poisson``.
     """
-    arrivals: list[float] = []
+    arrivals: list[float] = [0.0]
     now = 0.0
-    while len(arrivals) < count:
+    while len(arrivals) < intervals + 1:
         burst = max(2, int(rng.poisson(session_mean)))
         gaps = rng.exponential(4.0, burst)
         for gap in gaps:
             now += gap
             arrivals.append(now)
         now += rng.exponential(3600.0)
-    return np.array(arrivals[:count])
+    return np.array(arrivals[: intervals + 1])
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,12 +113,17 @@ class Mix:
             raise ValueError(f"negative class shares must sum to 1, got {total}")
 
 
-def negatives(count: int, samples: int, rng: np.random.Generator, mix: Mix | None = None) -> list[np.ndarray]:
-    """``samples`` series of non periodic traffic, each with ``count`` arrivals."""
+def negatives(intervals: int, samples: int, rng: np.random.Generator, mix: Mix | None = None) -> list[np.ndarray]:
+    """``samples`` series of non periodic traffic, each with ``intervals`` intervals.
+
+    The unit is intervals, matching ``positives``. Anything else makes the
+    false positive rate a rate at a different series length than the detection
+    rate it is paired with.
+    """
     mix = mix or Mix()
     how_many_poisson = int(round(samples * mix.poisson_share))
-    series = [poisson(count, rng.uniform(1.0, 60.0), rng) for _ in range(how_many_poisson)]
-    series += [bursty(count, rng) for _ in range(samples - how_many_poisson)]
+    series = [poisson(intervals, rng.uniform(1.0, 60.0), rng) for _ in range(how_many_poisson)]
+    series += [bursty(intervals, rng) for _ in range(samples - how_many_poisson)]
     return series
 
 

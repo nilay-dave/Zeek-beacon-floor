@@ -7,7 +7,7 @@ import pytest
 
 from zbf.detect import DETECTORS
 from zbf.detect.base import Detector
-from zbf.detect.spectral import BINS_PER_INTERVAL, SPARSITY_ALLOWANCE
+from zbf.detect.spectral import BINS_PER_INTERVAL, MINIMUM_BINS, SPARSITY_ALLOWANCE, TOO_SPARSE, _binned
 from zbf.synth import COBALT_STRIKE, SYMMETRIC, beacon, bursty, poisson
 
 
@@ -109,3 +109,88 @@ def test_session_traffic_is_refused_by_the_spectral_detectors_not_mis_scored():
     span_bins = intervals.sum() / (np.median(intervals) / BINS_PER_INTERVAL)
     assert span_bins > SPARSITY_ALLOWANCE * BINS_PER_INTERVAL * series.size
     assert DETECTORS["autocorrelation"].score(series) == 0.0
+
+
+def test_a_perfect_beacon_scores_one_whatever_its_period(tmp_path=None):
+    """The rounding bug that made bowley-skew look like a failed idea.
+
+    np.diff(np.cumsum(...)) does not return exactly equal intervals when the
+    period is not representable in binary, so a perfect beacon had an
+    interquartile spread of about 1e-13 and the skewness was computed from
+    that rounding noise. The guard tested `spread <= 0`, which only catches
+    exact equality, so 39 percent of perfect beacons scored below 0.5 and the
+    worst scored 0.0.
+    """
+    detector = DETECTORS["bowley-skew"]
+    assert detector.score(np.concatenate([[0.0], np.cumsum(np.full(16, 2047.3771254706232))])) == 1.0
+
+    rng = np.random.default_rng(0)
+    scores = []
+    for _ in range(300):
+        period = float(rng.uniform(30.0, 3600.0))
+        scores.append(detector.score(np.concatenate([[0.0], np.cumsum(np.full(16, period))])))
+    assert min(scores) == 1.0
+
+
+def test_the_spectral_noise_floor_is_near_zero_at_every_series_length():
+    """Pure noise must score near zero however long you watched.
+
+    The floor subtracted was 1/k, the mean share of spectral energy per bin,
+    where the statistic being corrected is a maximum. For k exponential bin
+    powers the expected maximum share is the harmonic number over k, which is
+    ln(k) times larger, so noise scored 0.16 at 16 bins and 0.006 at 1024. On
+    a real log that makes a short pair outrank a long one at the same degree
+    of irregularity, under one fixed threshold.
+    """
+    detector = DETECTORS["spectral"]
+    for intervals in (16, 64, 256):
+        rng = np.random.default_rng(5)
+        scores = [detector.score(poisson(intervals, 12.0, rng)) for _ in range(120)]
+        present = [s for s in scores if s is not None]
+        assert float(np.mean(present)) < 0.02, f"noise floor too high at {intervals} intervals"
+
+
+def test_a_spectral_judgement_of_not_periodic_is_not_a_refusal():
+    """Zero means 'not periodic'. None means 'watch longer'.
+
+    Both used to come back as zero, so a series the detector had declined to
+    evaluate got the same confident answer as one it had judged. Session
+    traffic is the judged case and must stay judged, because it is the hard
+    negative the false positive rate is calibrated against.
+    """
+    detector = DETECTORS["autocorrelation"]
+    sparse = np.concatenate([np.arange(10.0), [3610.0, 10810.0]])
+    series, reason = _binned(np.diff(sparse))
+    assert series is None and reason == TOO_SPARSE
+    assert detector.score(sparse) == 0.0
+
+    # Below its minimum it refuses, and that refusal reaches the caller.
+    assert detector.score(np.arange(4.0)) is None
+
+
+def test_the_minimum_bin_guard_is_unreachable_through_a_detector():
+    """Stated rather than tested through the public API, because it cannot be.
+
+    A series of n equal intervals bins to 4n + 1 cells, so four intervals
+    already give seventeen and the spectral detectors require six. The guard
+    stays as a guard on _binned for anyone who lowers min_intervals, and this
+    records why no test drives it from the outside.
+    """
+    for count in (4, 6, 8):
+        series, reason = _binned(np.full(count, 10.0))
+        assert reason is None
+        assert len(series) >= MINIMUM_BINS
+
+
+def test_mad_ratio_declares_the_tie_blindness_it_has():
+    """Ten connections a second apart then two hour long gaps score a perfect 1.
+
+    A bare majority of identical intervals sets the median absolute deviation
+    to zero with no bound on the rest. Real logs with second resolution
+    timestamps produce exactly this, so it belongs in blind_to rather than
+    being discovered by a user.
+    """
+    series = np.concatenate([np.arange(10.0), [3610.0, 10810.0]])
+    assert DETECTORS["mad-ratio"].score(series) == 1.0
+    assert DETECTORS["interval-cv"].score(series) == 0.0
+    assert "identical" in DETECTORS["mad-ratio"].blind_to

@@ -31,13 +31,25 @@ def _mad_ratio(intervals: np.ndarray) -> float:
     return clamp01(1.0 - mad / median)
 
 
+# A spread this small relative to the median is rounding, not structure.
+# np.diff(np.cumsum(...)) does not return exactly equal intervals for a period
+# that is not representable in binary: the error accumulates through the sum,
+# so a perfect beacon with a period of 2047.3771254706232 has an interquartile
+# spread of 4.5e-13. Testing `spread <= 0` caught only exact equality, so the
+# skewness was then computed from that rounding noise and a perfect beacon
+# scored 0.0. Across periods drawn the way the benchmark draws them, 39 percent
+# of perfect beacons scored below 0.5 for this reason alone.
+DEGENERATE_SPREAD = 1e-9
+
+
 def _bowley_skew(intervals: np.ndarray) -> float:
     q1, q2, q3 = (float(v) for v in np.percentile(intervals, [25, 50, 75]))
     spread = q3 - q1
-    if spread <= 0:
-        # Every interval in the middle half is identical, which is as regular as
-        # a series gets. Returning 0 here, as an undefined skew, would score a
-        # perfect beacon at zero.
+    median = abs(q2)
+    if spread <= DEGENERATE_SPREAD * max(median, 1.0):
+        # Every interval in the middle half is identical to within rounding,
+        # which is as regular as a series gets. Returning 0 here, as an
+        # undefined skew, would score a perfect beacon at zero.
         return 1.0
     return clamp01(1.0 - abs((q3 + q1 - 2 * q2) / spread))
 
@@ -54,8 +66,9 @@ INTERVAL_CV = Detector(
 MAD_RATIO = Detector(
     name="mad-ratio",
     summary="One minus the median absolute deviation over the median, so outliers do not dominate.",
-    blind_to="a slow drift in the interval, which stays close to the median throughout, "
-    "and anything about the order the intervals arrived in",
+    blind_to="a slow drift in the interval, which stays close to the median throughout; "
+    "anything about the order the intervals arrived in; and a bare majority of identical "
+    "intervals, which sets the deviation to zero and scores a perfect 1 however wild the rest are",
     min_intervals=3,
     _score=_mad_ratio,
 )

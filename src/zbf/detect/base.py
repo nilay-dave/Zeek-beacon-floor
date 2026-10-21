@@ -58,7 +58,14 @@ class Detector:
         intervals = intervals[intervals > 0]
         if intervals.size < self.min_intervals:
             return None
-        return float(np.clip(self._score(intervals), 0.0, 1.0))
+        # A detector may refuse on its own terms as well: the spectral pair
+        # needs a minimum number of bins, which depends on the span and not
+        # only on the count. Its refusal propagates rather than becoming a
+        # confident zero.
+        value = self._score(intervals)
+        if value is None:
+            return None
+        return float(np.clip(value, 0.0, 1.0))
 
 
 def clamp01(value: float) -> float:

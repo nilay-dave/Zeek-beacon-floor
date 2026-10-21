@@ -155,3 +155,31 @@ def test_positives_draw_a_period_per_beacon():
     series = positives(20, 40, 0.1, rng)
     periods = {round(float(np.median(np.diff(s))), 3) for s in series}
     assert len(periods) > 30
+
+
+def test_positives_and_negatives_agree_on_what_an_interval_is():
+    """The mismatch that made the published floors wrong.
+
+    beacon() built N sleeps and prepended t=0, giving N intervals. poisson()
+    and bursty() returned N arrivals, giving N-1. So every comparison scored
+    positives at one series length while calibrating the threshold at another.
+    """
+    rng = np.random.default_rng(0)
+    wanted = 6
+    for series in positives(wanted, 3, 0.0, rng) + negatives(wanted, 4, rng):
+        assert series.size - 1 == wanted
+
+
+def test_the_shortest_grid_point_is_measured_rather_than_forced_to_zero():
+    """At intervals == min_intervals every negative used to be refused.
+
+    With no negative scored there was no threshold, and the early return
+    reported a detection rate of zero for a detector that had scored every
+    positive correctly. docs/metrics.json carried "6": 0.0 for both spectral
+    detectors followed by "8": 1.0.
+    """
+    for name in ("autocorrelation", "spectral"):
+        detector = DETECTORS[name]
+        point = measure(detector, detector.min_intervals, 0.0, np.random.default_rng(1), samples=200)
+        assert point.scored_negatives == 200
+        assert point.tpr > 0.5

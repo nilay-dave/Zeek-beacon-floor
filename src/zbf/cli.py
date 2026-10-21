@@ -176,13 +176,23 @@ def _required_from_metrics(path: Path, detectors, jitter_grid) -> tuple[dict, li
     headline = payload.get("headline")
     if not headline:
         return None
-    grid = [j / 100 for j in (int(k) for k in next(iter(headline.values()))["intervals_needed_by_jitter"])]
+    first = next(iter(headline.values()))["intervals_needed_by_jitter"]
+    try:
+        keys = sorted(first, key=int)
+    except ValueError:
+        # Jitter keys are integer percentages. Anything else is a metrics file
+        # this code cannot address, and plotting it would pair each floor with
+        # the wrong jitter without saying so.
+        return None
+    grid = [int(k) / 100 for k in keys]
+    # Read in sorted key order rather than dict insertion order, so a floor is
+    # always plotted against the jitter it was measured at.
     required = {
-        name: list(headline[name]["intervals_needed_by_jitter"].values()) for name in detectors if name in headline
+        name: [headline[name]["intervals_needed_by_jitter"][k] for k in keys] for name in detectors if name in headline
     }
     if not required:
         return None
-    return required, sorted(grid)
+    return required, grid
 
 
 def cmd_chart(args) -> int:

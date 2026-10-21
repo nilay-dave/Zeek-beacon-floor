@@ -69,7 +69,9 @@ them specifically:
 **Bowley skewness.** A quartile based measure of asymmetry,
 `(Q3 + Q1 - 2 * Q2) / (Q3 - Q1)`, chosen over the third moment because it is
 defined on small samples without the variance of a cubed term. It is the basis
-of the `bowley-skew` detector, which does not work, for reasons recorded in
+of the `bowley-skew` detector. It appeared not to work at all until an outside
+review found that the guard for a degenerate spread tested exact floating point
+equality, so a perfect beacon was scored from rounding noise. See
 [ADR 003](adr/adr-003-keep-the-detector-that-fails.md).
 
 **Autocorrelation through the frequency domain.** The arrival train is binned,

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,12 +61,22 @@ def _open(path: Path) -> IO[str]:
 
 
 def _number(value: str, cast, default):
+    """Cast an optional field, or fall back.
+
+    Rejects the non finite floats that float() accepts. "inf", "nan" and
+    "1e400" all parse, and an infinite timestamp reached the spectral
+    detectors and raised OverflowError converting a bin count, aborting a
+    whole run on one corrupted field.
+    """
     if value in UNSET:
         return default
     try:
-        return cast(value)
+        parsed = cast(value)
     except ValueError:
         return default
+    if isinstance(parsed, float) and not math.isfinite(parsed):
+        return default
+    return parsed
 
 
 def _from_mapping(row: dict, source: str, line_number: int) -> Connection | None:
@@ -75,8 +86,28 @@ def _from_mapping(row: dict, source: str, line_number: int) -> Connection | None
             f"{source} line {line_number}: conn.log is missing {', '.join(missing)}. "
             "This reader needs ts, id.orig_h, id.resp_h and id.resp_p."
         )
-    ts = _number(str(row["ts"]), float, None)
+    raw_ts = str(row["ts"])
+    ts = _number(raw_ts, float, None)
     port = _number(str(row["id.resp_p"]), int, None)
+    if ts is None and raw_ts not in UNSET:
+        # Present but unusable. Unset is a missing field and is skipped above;
+        # a value that is there and cannot be read is corrupt data, and
+        # skipping it silently dropped every record in a whole class of real
+        # logs while reporting no error at all.
+        #
+        # The hint is chosen from the value, because the two causes need
+        # different fixes and a message that guesses wrong wastes the reader's
+        # time. An ISO8601 ts means Zeek was configured with
+        # LogAscii::json_timestamps = JSON::TS_ISO8601, the usual setting for
+        # shipping into ELK. Anything else is a damaged field.
+        looks_like_a_date = any(c in raw_ts for c in "T-:") and any(c.isdigit() for c in raw_ts)
+        hint = (
+            "A log written with LogAscii::json_timestamps = JSON::TS_ISO8601 has to be "
+            "re-exported with the default JSON::TS_EPOCH, or converted before it is read."
+            if looks_like_a_date
+            else "This reader needs finite epoch seconds."
+        )
+        raise ConnLogError(f"{source} line {line_number}: ts is {raw_ts!r}, which is not a usable number. {hint}")
     if ts is None or port is None:
         return None
     if str(row["id.orig_h"]) in UNSET or str(row["id.resp_h"]) in UNSET:
@@ -99,6 +130,11 @@ def fields(path: Path) -> list[str]:
     with _open(path) as handle:
         for line_number, line in enumerate(handle, start=1):
             line = line.rstrip("\n")
+            if not line.strip():
+                # read() skips blank lines; this used to call the first one a
+                # malformed record and report a missing #fields header, which
+                # is a diagnosis of a problem the file does not have.
+                continue
             if line.startswith("#fields"):
                 return line.split("\t")[1:]
             if line.startswith("#"):

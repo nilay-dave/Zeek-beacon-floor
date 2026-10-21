@@ -171,3 +171,56 @@ def test_a_log_missing_a_required_field_says_which(tmp_path):
     path = write_tsv(tmp_path, header, [row])
     with pytest.raises(ConnLogError, match="id.resp_p"):
         list(read(path))
+
+
+def test_iso8601_timestamps_are_reported_rather_than_silently_dropped(tmp_path):
+    """The silent misread this reader exists to prevent.
+
+    Zeek configured with LogAscii::json_timestamps = JSON::TS_ISO8601, which
+    is the normal setting for shipping into ELK, writes ts as a string. Every
+    record parsed to None and was skipped, so a whole log read as zero records
+    with no error and the tool told the analyst their estate had no pairs
+    worth scoring.
+    """
+    path = tmp_path / "conn.json"
+    rows = [
+        json.dumps(
+            {
+                "ts": f"2024-01-01T00:0{i}:00.000000Z",
+                "id.orig_h": "10.0.0.1",
+                "id.resp_h": "8.8.8.8",
+                "id.resp_p": 53,
+            }
+        )
+        for i in range(6)
+    ]
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    with pytest.raises(ConnLogError, match="TS_ISO8601"):
+        list(read(path))
+
+
+def test_a_non_finite_timestamp_is_rejected(tmp_path):
+    """float() accepts "inf", "nan" and "1e400".
+
+    An infinite ts reached the spectral detectors and raised OverflowError
+    converting a bin count, which aborted a whole run on one corrupted field.
+    """
+    path = tmp_path / "conn.json"
+    base = {"id.orig_h": "10.0.0.1", "id.resp_h": "8.8.8.8", "id.resp_p": 53}
+    for value in ("inf", "1e400", "nan"):
+        path.write_text(json.dumps({"ts": value, **base}) + "\n", encoding="utf-8")
+        with pytest.raises(ConnLogError, match="finite epoch seconds"):
+            list(read(path))
+
+    # And the fix does not reject a normal timestamp.
+    path.write_text(json.dumps({"ts": 1700000000.0, **base}) + "\n", encoding="utf-8")
+    assert next(iter(read(path))).ts == 1700000000.0
+
+
+def test_a_blank_first_line_does_not_produce_a_wrong_diagnosis(tmp_path):
+    """read() skips blank lines; fields() called the first one a missing header."""
+    path = tmp_path / "conn.json"
+    row = json.dumps({"ts": 1.0, "id.orig_h": "a", "id.resp_h": "b", "id.resp_p": 1})
+    path.write_text("\n" + row + "\n", encoding="utf-8")
+    assert fields(path) == ["ts", "id.orig_h", "id.resp_h", "id.resp_p"]
+    assert len(list(read(path))) == 1

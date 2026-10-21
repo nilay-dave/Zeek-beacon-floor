@@ -16,9 +16,16 @@ format, lint and the tests. Run it before opening a pull request.
 **A detector declares what it is blind to, and a test demonstrates it.** The
 `blind_to` field is required and an empty one raises at construction. It is not
 documentation: `bowley-skew` declares that symmetric jitter is skew free, and
-the benchmark then measures it detecting almost nothing, which is why that
-detector is in the repository at all. A new detector needs the same treatment,
-including the test that makes the blindness visible rather than asserted.
+the benchmark measures it degrading as jitter rises. A new detector needs the
+same treatment, including the test that makes the blindness visible rather
+than asserted.
+
+Be careful with the inverse. A measurement that agrees with a declaration is
+not evidence the declaration was doing work: `bowley-skew` failed everywhere
+for a while, the declaration explained it, and the real cause was a floating
+point bug. [ADR 003](docs/adr/adr-003-keep-the-detector-that-fails.md) is
+about that. If a detector fails where its declared blindness does not apply,
+that is the case to chase.
 
 **A detector refuses rather than guesses.** Below `min_intervals` it returns
 None, and the scoring output prints that as "too short" rather than as a low

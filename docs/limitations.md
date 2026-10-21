@@ -89,6 +89,23 @@ and the true value is somewhere above 16. The grid is coarse at the top on
 purpose, because that is the region where the answer is "more than you are
 going to get".
 
+## These results have been reviewed from the outside exactly once
+
+That review found four defects, and two of them had changed published numbers:
+a guard that tested exact floating point equality, so a perfect beacon was
+scored from rounding noise; and a mismatch where the generated beacons carried
+one more interval than the background traffic they were calibrated against, so
+the false positive rate was a rate at a different series length than the
+detection rate beside it.
+
+Neither was findable by rerunning the benchmark, adding seeds, or reading the
+results, because the output was self consistent and there was a true statement
+available that explained it. Both were found by a reader given the code and no
+expectations.
+
+The honest reading is that the numbers here have survived one outside read.
+That is more than most published benchmarks and much less than enough.
+
 ## What would make this stronger
 
 In roughly descending order of how much it would change the conclusions:

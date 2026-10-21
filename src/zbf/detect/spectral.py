@@ -35,27 +35,46 @@ MINIMUM_BINS = 16
 SPARSITY_ALLOWANCE = 8
 
 
-def _binned(intervals: np.ndarray) -> np.ndarray | None:
-    """Rebuild an arrival train from the intervals and bin it."""
+TOO_SHORT = "too short"
+TOO_SPARSE = "too sparse"
+
+
+def _binned(intervals: np.ndarray) -> tuple[np.ndarray | None, str | None]:
+    """Rebuild an arrival train from the intervals and bin it.
+
+    Returns the reason when it cannot, because the two reasons mean opposite
+    things to a caller and both used to collapse to a score of zero.
+
+    TOO_SHORT is a refusal: there is not enough series to judge, and the
+    caller must report that rather than "not a beacon".
+
+    TOO_SPARSE is a judgement: the intervals differ by orders of magnitude, so
+    the arrival train is mostly empty. That is strong evidence against a
+    beacon and scores zero, which also keeps session traffic in the negative
+    class where the false positive rate needs it.
+    """
     median = float(np.median(intervals))
-    if median <= 0:
-        return None
+    if median <= 0 or not np.isfinite(median):
+        return None, TOO_SHORT
     arrivals = np.concatenate([[0.0], np.cumsum(intervals)])
+    span = float(arrivals[-1])
     width = median / BINS_PER_INTERVAL
-    count = int(np.ceil(arrivals[-1] / width)) + 1
+    if not np.isfinite(span) or width <= 0 or span / width > 1e9:
+        return None, TOO_SPARSE
+    count = int(np.ceil(span / width)) + 1
     if count < MINIMUM_BINS:
-        return None
+        return None, TOO_SHORT
     if count > SPARSITY_ALLOWANCE * BINS_PER_INTERVAL * arrivals.size:
-        return None
+        return None, TOO_SPARSE
     series = np.zeros(count, dtype=float)
     np.add.at(series, np.minimum((arrivals / width).astype(int), count - 1), 1.0)
-    return series - series.mean()
+    return series - series.mean(), None
 
 
-def _autocorrelation_peak(intervals: np.ndarray) -> float:
-    series = _binned(intervals)
+def _autocorrelation_peak(intervals: np.ndarray) -> float | None:
+    series, reason = _binned(intervals)
     if series is None:
-        return 0.0
+        return None if reason == TOO_SHORT else 0.0
     energy = float(np.dot(series, series))
     if energy <= 0:
         return 0.0
@@ -75,10 +94,10 @@ def _autocorrelation_peak(intervals: np.ndarray) -> float:
     return clamp01(float(np.max(correlation[start:])))
 
 
-def _spectral_prominence(intervals: np.ndarray) -> float:
-    series = _binned(intervals)
+def _spectral_prominence(intervals: np.ndarray) -> float | None:
+    series, reason = _binned(intervals)
     if series is None:
-        return 0.0
+        return None if reason == TOO_SHORT else 0.0
     power = np.abs(np.fft.rfft(series)) ** 2
     if power.size < 3:
         return 0.0
@@ -87,12 +106,20 @@ def _spectral_prominence(intervals: np.ndarray) -> float:
     total = float(np.sum(power))
     if total <= 0:
         return 0.0
-    # The share of spectral energy in the strongest frequency. White noise
-    # spreads its energy evenly, so this is near 1/len(power); a clean beacon
-    # concentrates it. Rescaled so that the noise floor sits near zero rather
-    # than at an arbitrary small number that varies with the series length.
+    # The share of spectral energy in the strongest frequency, measured against
+    # what white noise would give.
+    #
+    # The floor is NOT 1/k, the mean share per bin. The statistic is a maximum,
+    # and for k independent exponential bin powers the expected maximum share
+    # is the harmonic number over k, which is ln(k) times larger. Subtracting
+    # the mean left a noise floor that still fell with series length: pure
+    # noise scored 0.16 at 16 bins and 0.006 at 1024, so on a real log a short
+    # pair scored higher than a long one at the same degree of irregularity.
     share = float(np.max(power)) / total
-    floor = 1.0 / power.size
+    k = power.size
+    floor = float(np.sum(1.0 / np.arange(1, k + 1))) / k
+    if floor >= 1.0:
+        return 0.0
     return clamp01((share - floor) / (1.0 - floor))
 
 
