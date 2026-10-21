@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -55,7 +56,13 @@ def cmd_score(args) -> int:
     results = score(pairs, chosen)[: args.top]
 
     names = list(chosen)
-    header = f"{'pair':<46} {'conns':>6} {'period':>9} {'hours':>7} " + " ".join(f"{n:>9}" for n in names)
+    # Each detector column is as wide as its own name. Fixed width columns put
+    # "autocorrelation", which is fifteen characters, over nine character cells
+    # and silently misaligned every row under it.
+    widths = {name: max(9, len(name)) for name in names}
+    header = f"{'pair':<46} {'conns':>6} {'period':>9} {'hours':>7} " + " ".join(
+        f"{name:>{widths[name]}}" for name in names
+    )
     print(header)
     for result in results:
         series = result.series
@@ -64,7 +71,8 @@ def cmd_score(args) -> int:
         cells = []
         for name in names:
             value = result.scores[name]
-            cells.append(f"{'too short':>9}" if value is None else f"{value:>9.3f}")
+            width = widths[name]
+            cells.append(f"{'too short':>{width}}" if value is None else f"{value:>{width}.3f}")
         print(f"{series.label():<46} {series.connections:>6} {shown:>9} {series.span_hours:>7.1f} " + " ".join(cells))
     print()
     print(
@@ -154,19 +162,56 @@ def cmd_hours(args) -> int:
     return 0
 
 
+def _required_from_metrics(path: Path, detectors, jitter_grid) -> tuple[dict, list[float]] | None:
+    """Read the published floors instead of measuring them again.
+
+    The benchmark already measured this, and measuring it a second time to
+    draw it takes another twelve minutes and can land somewhere slightly
+    different. A chart that disagrees with the table beside it is worse than
+    no chart.
+    """
+    if not path.is_file():
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    headline = payload.get("headline")
+    if not headline:
+        return None
+    grid = [j / 100 for j in (int(k) for k in next(iter(headline.values()))["intervals_needed_by_jitter"])]
+    required = {
+        name: list(headline[name]["intervals_needed_by_jitter"].values()) for name in detectors if name in headline
+    }
+    if not required:
+        return None
+    return required, sorted(grid)
+
+
 def cmd_chart(args) -> int:
     from zbf.plot import floor_chart
 
     destination = Path(args.out)
+    chosen = _detectors(args.detectors)
+    interval_grid = [int(v) for v in args.intervals.split(",")]
+    jitter_grid = [float(v) for v in args.jitter.split(",")]
+
+    required = None
+    if not args.measure:
+        found = _required_from_metrics(Path(args.metrics), chosen, jitter_grid)
+        if found is not None:
+            required, jitter_grid = found
+            print(f"drawing the floors published in {args.metrics}")
+    if required is None:
+        print("measuring the floor, which takes a while. Use --metrics to draw published figures instead.")
+
     floor_chart(
         destination,
-        detectors=_detectors(args.detectors),
-        interval_grid=[int(v) for v in args.intervals.split(",")],
-        jitter_grid=[float(v) for v in args.jitter.split(",")],
+        detectors=chosen,
+        interval_grid=interval_grid,
+        jitter_grid=jitter_grid,
         seeds=args.seeds,
         samples=args.samples,
         fpr=args.fpr,
         model=args.model,
+        required=required,
     )
     print(f"wrote {destination}")
     return 0
@@ -223,6 +268,8 @@ def build_parser() -> argparse.ArgumentParser:
     one = subparsers.add_parser("chart", help="draw the floor")
     sweep_arguments(one)
     one.add_argument("--out", default="docs/img/floor.png")
+    one.add_argument("--metrics", default="docs/metrics.json", help="draw these published floors")
+    one.add_argument("--measure", action="store_true", help="measure again instead of drawing the published floors")
     one.set_defaults(func=cmd_chart)
     return parser
 

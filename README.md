@@ -115,10 +115,19 @@ zbf score conn.log --top 20
 ```
 
 ```
-pair                                            conns    period   hours  interval-cv  autocorrelation
-10.0.0.9 -> 203.0.113.5:443                        41     10.0m     6.8        0.981            0.943
-10.0.0.9 -> 198.51.100.7:80                        38      9.4m     5.9        0.112            0.087
+pair                                            conns    period   hours interval-cv mad-ratio autocorrelation
+10.0.0.9 -> 203.0.113.5:443                        41      9.4m     6.2       0.957     0.958           0.853
+10.0.0.23 -> 203.0.113.19:8443                     29      3.4m     1.6       0.778     0.781           0.243
+10.0.0.41 -> 198.51.100.90:80                      36      0.1m     0.7       0.000     0.376           0.000
+10.0.0.9 -> 198.51.100.7:443                       40      4.9m     5.2       0.000     0.226           0.175
 ```
+
+Four pairs, in order: a beacon at low jitter, a beacon at 60 percent jitter, a
+burst of session traffic, and memoryless traffic. The third row is the one
+worth looking at. `interval-cv` scores it zero and `mad-ratio` scores it 0.376,
+because inside a burst the intervals are short and similar and the median
+absolute deviation does not mind. Detectors disagreeing is information, which
+is why the output shows all of them rather than one combined score.
 
 Both TSV and JSON conn.logs are read, gzipped or not. The TSV reader takes
 column names from the `#fields` header rather than assuming positions, because
@@ -130,7 +139,7 @@ rather than guessed.
 <!--number:runtime[1].connections-->245,000<!--/number--> connections across
 <!--number:runtime[1].pairs-->10,000<!--/number--> pairs, scored by all five
 detectors, takes
-<!--number:runtime[1].seconds-->5.9<!--/number--> seconds.
+<!--number:runtime[1].seconds-->6.0<!--/number--> seconds.
 
 ## The detectors
 

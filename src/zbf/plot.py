@@ -145,7 +145,9 @@ def floor_chart(
     right.set_title(f"The same floor for a {period_seconds / 3600:.0f} hour beacon", fontsize=11)
     for hours, label in ((12, "12h, common minimum"), (24, "24h, commonly called ideal")):
         right.axhline(hours, color="#b02418", linewidth=1.0, linestyle="--", alpha=0.8)
-        right.text(jitter_grid[-1], hours * 1.09, label, fontsize=8, color="#b02418", ha="right")
+        # Left aligned: every curve is well below both lines at zero jitter,
+        # and right aligned these sat on top of the lines they describe.
+        right.text(jitter_grid[0], hours * 1.09, label, fontsize=8, color="#b02418")
     right.grid(alpha=0.25, linewidth=0.6)
     right.legend(fontsize=9, loc="upper left")
 

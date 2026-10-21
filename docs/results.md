@@ -88,7 +88,7 @@ A real beacon misses: a laptop closes, a link drops. With 20% of check ins remov
 
 | pairs | connections | all five detectors |
 | --- | --- | --- |
-| 1,000 | 24,500 | 0.58s |
-| 10,000 | 245,000 | 5.92s |
+| 1,000 | 24,500 | 0.57s |
+| 10,000 | 245,000 | 6.04s |
 
-245,000 connections scored by every detector in 5.9 seconds, which is a conn.log sized problem on a laptop.
+245,000 connections scored by every detector in 6.0 seconds, which is a conn.log sized problem on a laptop.

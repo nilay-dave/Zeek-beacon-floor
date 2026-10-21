@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
@@ -152,3 +154,89 @@ def test_chart_writes_a_file(tmp_path):
         == 0
     )
     assert destination.stat().st_size > 1000
+
+
+def test_chart_draws_the_published_floors_rather_than_measuring_again(tmp_path, capsys):
+    """The benchmark already measured this.
+
+    Measuring it again to draw it takes another twelve minutes and can land
+    somewhere slightly different, and a chart that disagrees with the table
+    beside it is worse than no chart.
+    """
+    metrics = tmp_path / "metrics.json"
+    metrics.write_text(
+        json.dumps(
+            {
+                "headline": {
+                    "interval-cv": {"intervals_needed_by_jitter": {"0": 4, "40": 6, "80": 12, "100": 32}},
+                    "bowley-skew": {"intervals_needed_by_jitter": {"0": None, "40": None, "80": None, "100": None}},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    destination = tmp_path / "floor.png"
+    assert main(["chart", "--metrics", str(metrics), "--out", str(destination)]) == 0
+    out = capsys.readouterr().out
+    assert "drawing the floors published" in out
+    assert destination.stat().st_size > 1000
+
+
+def test_chart_measures_when_there_is_no_metrics_file(tmp_path, capsys):
+    destination = tmp_path / "floor.png"
+    assert (
+        main(
+            [
+                "chart",
+                "--metrics",
+                str(tmp_path / "absent.json"),
+                "--detectors",
+                "interval-cv",
+                "--intervals",
+                "8,16",
+                "--jitter",
+                "0.2,0.6",
+                "--seeds",
+                "1",
+                "--samples",
+                "60",
+                "--out",
+                str(destination),
+            ]
+        )
+        == 0
+    )
+    assert "measuring the floor" in capsys.readouterr().out
+
+
+def test_chart_measures_when_asked_to_even_with_metrics_present(tmp_path, capsys):
+    metrics = tmp_path / "metrics.json"
+    metrics.write_text(
+        json.dumps({"headline": {"interval-cv": {"intervals_needed_by_jitter": {"0": 4, "20": 6}}}}),
+        encoding="utf-8",
+    )
+    destination = tmp_path / "floor.png"
+    assert (
+        main(
+            [
+                "chart",
+                "--metrics",
+                str(metrics),
+                "--measure",
+                "--detectors",
+                "interval-cv",
+                "--intervals",
+                "8,16",
+                "--jitter",
+                "0.2",
+                "--seeds",
+                "1",
+                "--samples",
+                "60",
+                "--out",
+                str(destination),
+            ]
+        )
+        == 0
+    )
+    assert "measuring the floor" in capsys.readouterr().out
