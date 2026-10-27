@@ -1,8 +1,8 @@
 site_name: zeek-beacon-floor
 site_description: Where beacon detection stops working, measured in intervals observed rather than hours of capture.
-site_url: https://__GITHUB_USERNAME__.github.io/zeek-beacon-floor/
-repo_url: https://github.com/__GITHUB_USERNAME__/zeek-beacon-floor
-repo_name: __GITHUB_USERNAME__/zeek-beacon-floor
+site_url: https://nilay-dave.github.io/zeek-beacon-floor/
+repo_url: https://github.com/nilay-dave/zeek-beacon-floor
+repo_name: nilay-dave/zeek-beacon-floor
 edit_uri: ""
 
 theme:

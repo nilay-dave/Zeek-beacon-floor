@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Report privately through GitHub's
-[security advisory form](https://github.com/__GITHUB_USERNAME__/zeek-beacon-floor/security/advisories/new)
+[security advisory form](https://github.com/nilay-dave/zeek-beacon-floor/security/advisories/new)
 rather than in a public issue. You should get a first response within a week.
 
 ## Scope

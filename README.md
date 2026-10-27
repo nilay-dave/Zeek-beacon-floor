@@ -1,7 +1,7 @@
 # zeek-beacon-floor
 
-[![CI](https://github.com/__GITHUB_USERNAME__/zeek-beacon-floor/actions/workflows/ci.yml/badge.svg)](https://github.com/__GITHUB_USERNAME__/zeek-beacon-floor/actions/workflows/ci.yml)
-[![coverage](https://img.shields.io/endpoint?url=https://__GITHUB_USERNAME__.github.io/zeek-beacon-floor/badges/coverage.json)](https://__GITHUB_USERNAME__.github.io/zeek-beacon-floor/)
+[![CI](https://github.com/nilay-dave/zeek-beacon-floor/actions/workflows/ci.yml/badge.svg)](https://github.com/nilay-dave/zeek-beacon-floor/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://nilay-dave.github.io/zeek-beacon-floor/badges/coverage.json)](https://nilay-dave.github.io/zeek-beacon-floor/)
 [![PyPI](https://img.shields.io/pypi/v/zeek-beacon-floor)](https://pypi.org/project/zeek-beacon-floor/)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 [![dependencies](https://img.shields.io/badge/runtime%20dependencies-2-green)](pyproject.toml)
