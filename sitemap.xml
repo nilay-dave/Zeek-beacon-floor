@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://nilay-dave.github.io/zeek-beacon-floor/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://nilay-dave.github.io/zeek-beacon-floor/limitations/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://nilay-dave.github.io/zeek-beacon-floor/results/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://nilay-dave.github.io/zeek-beacon-floor/sources/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://nilay-dave.github.io/zeek-beacon-floor/adr/adr-001-measure-in-intervals-not-hours/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://nilay-dave.github.io/zeek-beacon-floor/adr/adr-002-generous-to-the-detectors/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://nilay-dave.github.io/zeek-beacon-floor/adr/adr-003-keep-the-detector-that-fails/</loc>
+         <lastmod>2026-10-28</lastmod>
+    </url>
+</urlset>
