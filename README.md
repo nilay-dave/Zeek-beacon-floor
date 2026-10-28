@@ -1,8 +1,6 @@
 # zeek-beacon-floor
 
-[![CI](https://github.com/nilay-dave/zeek-beacon-floor/actions/workflows/ci.yml/badge.svg)](https://github.com/nilay-dave/zeek-beacon-floor/actions/workflows/ci.yml)
-[![coverage](https://img.shields.io/endpoint?url=https://nilay-dave.github.io/zeek-beacon-floor/badges/coverage.json)](https://nilay-dave.github.io/zeek-beacon-floor/)
-[![PyPI](https://img.shields.io/pypi/v/zeek-beacon-floor)](https://pypi.org/project/zeek-beacon-floor/)
+
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
 [![dependencies](https://img.shields.io/badge/runtime%20dependencies-2-green)](pyproject.toml)
 [![licence](https://img.shields.io/badge/licence-MIT-green)](LICENSE)
@@ -27,7 +25,7 @@ zbf score conn.log          # rank the pairs in a Zeek conn.log
 zbf hours --periods 3600    # how long must I watch for an hourly beacon?
 ```
 
-## Every number published here is a simulation
+
 
 No conn.log from a real network was used. The beacons are generated and so is
 the background traffic. One behaviour is sourced, Cobalt Strike's jitter
